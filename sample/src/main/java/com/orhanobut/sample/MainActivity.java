@@ -53,7 +53,7 @@ public class MainActivity extends Activity {
 //            .tag("mytag")
 //            .logDir("mylogdir")
 //            .build();
-//    Logger.addLogAdapter(new DiskLogAdapter(csvFormatStrategy));
+
 //
 //
 //    Logger.w("no thread info and only 1 method");
@@ -87,7 +87,14 @@ public class MainActivity extends Activity {
             .singleLineMethodInfo(true)
             .tag("DAMON")
         .build();
+    CsvFormatStrategy csvFormatStrategy = CsvFormatStrategy.newBuilder()
+            .tag("damon")
+            .logDir("mylogdir")
+            .singleLineMethodInfo(true)
+            .methodOffset(1)
+            .build();
     Logger.addLogAdapter(new AndroidLogAdapter(formatStrategy));
+    Logger.addLogAdapter(new DiskLogAdapter(csvFormatStrategy));
 
     VLog.w("damon","my log message with my tag");
     VLog.json("{ \"key\": 3, \"value\": something}");
@@ -104,7 +111,6 @@ public class MainActivity extends Activity {
         VLog.d("damon", "Runnable.run thread runnable called");
       }
     }.start();
-
   }
 
   @Override

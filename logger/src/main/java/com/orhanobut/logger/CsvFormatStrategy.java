@@ -23,11 +23,17 @@ public class CsvFormatStrategy implements FormatStrategy {
   private static final String NEW_LINE = System.getProperty("line.separator");
   private static final String NEW_LINE_REPLACEMENT = " <br> ";
   private static final String SEPARATOR = ",";
+  /**
+   * The minimum stack trace index, starts at this class after two native calls.
+   */
+  private static final int MIN_STACK_OFFSET = 5;
 
   @NonNull private final Date date;
   @NonNull private final SimpleDateFormat dateFormat;
   @NonNull private final LogStrategy logStrategy;
   @Nullable private final String tag;
+  private final boolean singleLineMethodInfo;
+  private final int methodOffset;
 
   private CsvFormatStrategy(@NonNull Builder builder) {
     checkNotNull(builder);
@@ -36,6 +42,8 @@ public class CsvFormatStrategy implements FormatStrategy {
     dateFormat = builder.dateFormat;
     logStrategy = builder.logStrategy;
     tag = builder.tag;
+    singleLineMethodInfo = builder.singleLineMethodInfo;
+    methodOffset = builder.methodOffset;
   }
 
   @NonNull public static Builder newBuilder() {
@@ -72,6 +80,16 @@ public class CsvFormatStrategy implements FormatStrategy {
       message = message.replaceAll(NEW_LINE, NEW_LINE_REPLACEMENT);
     }
     builder.append(SEPARATOR);
+    if (singleLineMethodInfo) {
+      builder = new StringBuilder();
+      StackTraceElement[] trace = Thread.currentThread().getStackTrace();
+      int stackIndex = getStackOffset(trace) + methodOffset + 1;
+      builder.append("[")
+              .append(getSimpleClassName(trace[stackIndex].getClassName()))
+              .append(".")
+              .append(trace[stackIndex].getMethodName())
+              .append("]  ");
+    }
     builder.append(message);
 
     // new line
@@ -87,6 +105,32 @@ public class CsvFormatStrategy implements FormatStrategy {
     return this.tag;
   }
 
+  /**
+   * Determines the starting index of the stack trace, after method calls made by this class.
+   *
+   * @param trace the stack trace
+   * @return the stack offset
+   */
+  private int getStackOffset(@NonNull StackTraceElement[] trace) {
+    checkNotNull(trace);
+
+    for (int i = MIN_STACK_OFFSET; i < trace.length; i++) {
+      StackTraceElement e = trace[i];
+      String name = e.getClassName();
+      if (!name.equals(LoggerPrinter.class.getName()) && !name.equals(Logger.class.getName())) {
+        return --i;
+      }
+    }
+    return -1;
+  }
+
+  private String getSimpleClassName(@NonNull String name) {
+    checkNotNull(name);
+
+    int lastIndex = name.lastIndexOf(".");
+    return name.substring(lastIndex + 1);
+  }
+
   public static final class Builder {
     private static final int MAX_BYTES = 500 * 1024; // 500K averages to a 4000 lines per file
 
@@ -95,6 +139,8 @@ public class CsvFormatStrategy implements FormatStrategy {
     LogStrategy logStrategy;
     String tag = "PRETTY_LOGGER";
     String logDir = "logger";
+    boolean singleLineMethodInfo = false;
+    int methodOffset = 0;
 
     private Builder() {
     }
@@ -121,6 +167,16 @@ public class CsvFormatStrategy implements FormatStrategy {
 
     @NonNull public Builder logDir(@Nullable String dir) {
       this.logDir = dir;
+      return this;
+    }
+
+    @NonNull public Builder singleLineMethodInfo(boolean val) {
+      this.singleLineMethodInfo = val;
+      return this;
+    }
+
+    @NonNull public Builder methodOffset(int val) {
+      methodOffset = val;
       return this;
     }
 
